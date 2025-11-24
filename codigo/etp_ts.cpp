@@ -8,6 +8,7 @@
 #include <cstdlib>
 #include <ctime>
 #include <deque>
+#include <chrono>
 #include <climits> // INT_MAX
 using namespace std;
 
@@ -26,6 +27,13 @@ struct Evaluacion {
 inline bool operator<(const Evaluacion& a, const Evaluacion& b) {
     if (a.bloques != b.bloques) return a.bloques < b.bloques;
     return a.penalizacion < b.penalizacion;
+}
+
+Evaluacion operator-(const Evaluacion& a, const Evaluacion& b) {
+    Evaluacion r;
+    r.penalizacion = a.penalizacion - b.penalizacion;
+    r.bloques      = a.bloques - b.bloques;
+    return r;
 }
 
 bool verificarBloqueValido( int examen,int bloqueNuevo,const vector<vector<int>>& AlumnosXPruebas,const map<int, vector<int>>& PruebasXAlumnos, const vector<pair<int,int>>& instancia) {
@@ -55,6 +63,25 @@ bool verificarBloqueValido( int examen,int bloqueNuevo,const vector<vector<int>>
     return true;
 }
 
+bool verificarSalaValida(int examen,int nuevaSala,int nuevoBloque,const vector<int>& Salas,const vector<vector<int>>& AlumnosXPruebas,const vector<map<int,bool>>& UsoSalas) {
+    int Nalumnos = AlumnosXPruebas[examen].size();
+
+    // 1) Verificar capacidad
+    if (Salas[nuevaSala] < Nalumnos) {
+        return false;
+    }
+
+    // 2) Verificar si la sala está libre en ese bloque
+    //    UsoSalas[sala][bloque] = true si está ocupada
+    auto it = UsoSalas[nuevaSala].find(nuevoBloque);
+    if (it != UsoSalas[nuevaSala].end() && it->second == true) {
+        return false;
+    }
+
+    // Sala válida
+    return true;
+}
+
 // funcion que evalua que tan buena es una instancia
 Evaluacion FuncionEvaluacion( const vector<pair<int,int>>& instancia, const vector<map<int,bool>>& bloques, const vector<vector<int>>& AlumnosXPruebas, const map<int, vector<int>>& PruebasXAlumnos){
     vector<int> Penal = {16,8,4,2,1};
@@ -65,6 +92,8 @@ Evaluacion FuncionEvaluacion( const vector<pair<int,int>>& instancia, const vect
 
     for (int examen = 0 ; examen < instancia.size() ; examen++) {
         int bloque = instancia[examen].first;
+        fe.penalizacion += bloque;
+
         const vector<int>& alumnos = AlumnosXPruebas[examen];
 
         for (int x = 1; x <= 5; x++) {
@@ -93,12 +122,14 @@ Evaluacion FuncionEvaluacion( const vector<pair<int,int>>& instancia, const vect
 }
 
 // Calcula la evaluacion de un examen especifico
-int FExExamen(const vector<pair<int,int>>& instancia, const vector<map<int,bool>>& bloques, const vector<vector<int>>& AlumnosXPruebas, const map<int, vector<int>>& PruebasXAlumnos, int examen){
+Evaluacion FExExamen(const vector<pair<int,int>>& instancia, const vector<map<int,bool>>& bloques, const vector<vector<int>>& AlumnosXPruebas, const map<int, vector<int>>& PruebasXAlumnos, int examen){
     vector<int> Penal = {16,8,4,2,1};
 
     const vector<int>& alumnos = AlumnosXPruebas[examen];
     int bloque = instancia[examen].first;
-    int FE = 0;
+    Evaluacion fe;
+    fe.bloques = bloques.size();
+    fe.penalizacion = bloque;
 
     // bloques hacia atrás
     for (int x = 1; x <= 5; x++) {
@@ -114,7 +145,7 @@ int FExExamen(const vector<pair<int,int>>& instancia, const vector<map<int,bool>
             for (int ex2 : itPA->second) {
                 auto it = examenes.find(ex2);
                 if (it != examenes.end() && it->second) {
-                    FE += Penal[x-1];
+                    fe.penalizacion += Penal[x-1];
                     goto atras_end;
                 }
             }
@@ -136,7 +167,7 @@ int FExExamen(const vector<pair<int,int>>& instancia, const vector<map<int,bool>
             for (int ex2 : itPA->second) {
                 auto it = examenes.find(ex2);
                 if (it != examenes.end() && it->second) {
-                    FE += Penal[x-1];
+                    fe.penalizacion += Penal[x-1];
                     goto adelante_end;
                 }
             }
@@ -144,11 +175,11 @@ int FExExamen(const vector<pair<int,int>>& instancia, const vector<map<int,bool>
         adelante_end:;
     }
 
-    return FE;
+    return fe;
 }
 
 // Crea una solucion inicial estandar
-vector<pair<int,int>> SolucionInicial( int NE, vector<map<int,bool>>& bloques, vector<map<int,bool>>& UsoSalas , const vector<vector<int>>& AlumnosXPruebas, const map<int, vector<int>>& PruebasXAlumnos, int NS, const vector<int>& Salas){
+vector<pair<int,int>> SolucionInicialGreedy( int NE, vector<map<int,bool>>& bloques, vector<map<int,bool>>& UsoSalas , const vector<vector<int>>& AlumnosXPruebas, const map<int, vector<int>>& PruebasXAlumnos, int NS, const vector<int>& Salas){
     vector<pair<int,int>> instancia(NE, {-1,-1});
     bloques.push_back({}); 
 
@@ -162,7 +193,7 @@ vector<pair<int,int>> SolucionInicial( int NE, vector<map<int,bool>>& bloques, v
 
             // intentar todas las salas
             for(int sala=0; sala<NS; sala++){
-                bool okSala   = !UsoSalas[sala].count(bloque);
+                bool okSala   = verificarSalaValida(examen, sala, bloque, Salas, AlumnosXPruebas, UsoSalas);
                 bool okBloque = verificarBloqueValido(examen, bloque, AlumnosXPruebas, PruebasXAlumnos, instancia);
 
                 if(okSala && okBloque){
@@ -176,7 +207,52 @@ vector<pair<int,int>> SolucionInicial( int NE, vector<map<int,bool>>& bloques, v
             }
         }
     }
-    
+    return instancia;
+}
+
+vector<pair<int,int>> SolucionInicialNaive( int NE, vector<map<int,bool>>& bloques, vector<map<int,bool>>& UsoSalas , const vector<vector<int>>& AlumnosXPruebas, const map<int, vector<int>>& PruebasXAlumnos, int NS, const vector<int>& Salas){
+    vector<pair<int,int>> instancia(NE, {-1,-1});
+    for(int i=0; i<NE; i++){
+        bloques.push_back({});
+        int Nalumnos = AlumnosXPruebas[i].size();
+
+        for(int sala=0; sala<NS; sala++){
+            if (Salas[sala] < Nalumnos) {
+                continue;
+            }
+
+            instancia[i] = {i, sala};
+            bloques[i][i] = true;
+            UsoSalas[sala][i]  = true;
+            break;   
+        }
+    }
+    return instancia;
+}
+
+vector<pair<int,int>> SolucionInicialAleatorio( int NE, vector<map<int,bool>>& bloques, vector<map<int,bool>>& UsoSalas , const vector<vector<int>>& AlumnosXPruebas, const map<int, vector<int>>& PruebasXAlumnos, int NS, const vector<int>& Salas){
+    vector<pair<int,int>> instancia(NE, {-1,-1});
+    bloques.push_back({}); 
+
+    for(int examen=0; examen<NE; examen++){
+        bool asignado = false;
+
+        while (!asignado) {
+            int bloque = rand() % max(0, (int)bloques.size() + 1);  
+            if (bloque == bloques.size()) bloques.push_back({});
+            int sala = rand() % NS;
+
+            bool okBloque = verificarBloqueValido( examen, bloque, AlumnosXPruebas, PruebasXAlumnos, instancia);
+            bool okSala   = verificarSalaValida( examen, sala, bloque, Salas, AlumnosXPruebas, UsoSalas);
+
+            if (okBloque && okSala) {
+                instancia[examen] = {bloque, sala};
+                bloques[bloque][examen] = true;
+                UsoSalas[sala][bloque] = true;
+                asignado = true;
+            }
+        }
+    }
     return instancia;
 }
 
@@ -187,29 +263,30 @@ bool estaEnTabu(int examen, const deque<int>& listaTabu) {
     return false;
 }
 
-bool verificarSalaValida(int examen,int nuevaSala,int nuevoBloque,const vector<int>& Salas,const vector<vector<int>>& AlumnosXPruebas,const vector<map<int,bool>>& UsoSalas) {
-    int Nalumnos = AlumnosXPruebas[examen].size();
-
-    // 1) Verificar capacidad
-    if (Salas[nuevaSala] < Nalumnos) {
-        return false;
+void guardarResultados( int archivo, int inicial, double tiempoInicial, double tiempoIter, int mejorpenalizacion,int bloques , int iteraciones ) {
+    string nombre;
+    switch (inicial) {
+        case 1: nombre = "Greedy.txt"; break;
+        case 2: nombre = "Naive.txt"; break;
+        case 3: nombre = "Aleatorio.txt"; break;
     }
 
-    // 2) Verificar si la sala está libre en ese bloque
-    //    UsoSalas[sala][bloque] = true si está ocupada
-    auto it = UsoSalas[nuevaSala].find(nuevoBloque);
-    if (it != UsoSalas[nuevaSala].end() && it->second == true) {
-        return false;
-    }
+    ofstream out(nombre , ios::app);
 
-    // Sala válida
-    return true;
+    out << "Archivo: " << archivo << "\n";
+    out << "Tiempo Sol Inicial(ms): " << tiempoInicial << "\n";
+    out << "Tiempo Iteraciones(ms): " << tiempoIter << "\n";
+    out << "Iteraciones: " << iteraciones << "\n";
+    out << "Mejor Sol: " << bloques << " "<< mejorpenalizacion << "\n";
+    out << "-------------------------------------\n";
+
+    out.close();
 }
 
 Movimiento iteracion( int NE, vector<map<int,bool>>& bloques, vector<map<int,bool>>& UsoSalas , const vector<vector<int>>& AlumnosXPruebas, const map<int, vector<int>>& PruebasXAlumnos, int NS, const vector<int>& Salas, vector<pair<int,int>>& instancia, const deque<int>& listaTabu) {
     Movimiento mejorvecino = {-1, 0, 0};
     Evaluacion mejorFE = {INT_MAX, INT_MAX};
-    int FE;
+    Evaluacion FE;
     for(int examen = 0; examen < NE; ++examen){
         if(estaEnTabu(examen, listaTabu)){
             continue;
@@ -220,10 +297,11 @@ Movimiento iteracion( int NE, vector<map<int,bool>>& bloques, vector<map<int,boo
 
         int bloqueInv = bloques.size() - bloqueActual - 1 ;
         int bloqueSig = bloqueActual + 1;
+        int bloqueAnt = bloqueActual - 1;
 
         int salaSig = (salaActual + 1 + rand() % NS) % NS;
 
-        int resta = FExExamen(instancia, bloques, AlumnosXPruebas, PruebasXAlumnos, examen);
+        Evaluacion resta = FExExamen(instancia, bloques, AlumnosXPruebas, PruebasXAlumnos, examen);
         // mov 1 y mov 3
         bool bloqueSigVal = verificarBloqueValido(examen, bloqueSig , AlumnosXPruebas, PruebasXAlumnos, instancia);
 
@@ -240,9 +318,9 @@ Movimiento iteracion( int NE, vector<map<int,bool>>& bloques, vector<map<int,boo
                 vecino[examen] ={bloqueSig, salaActual};
 
                 FE = FExExamen(vecino, bloquesMod, AlumnosXPruebas, PruebasXAlumnos, examen) - resta;
-                Evaluacion FEv = FuncionEvaluacion(vecino, bloquesMod, AlumnosXPruebas, PruebasXAlumnos);
-                if (FEv < mejorFE){
-                    mejorFE = FEv;
+                
+                if (FE < mejorFE){
+                    mejorFE = FE;
                     mejorvecino = {examen, bloqueSig,salaActual};  // e, bloque, sala
                 }
             }
@@ -251,9 +329,9 @@ Movimiento iteracion( int NE, vector<map<int,bool>>& bloques, vector<map<int,boo
                 vecino[examen] ={bloqueSig, salaSig};
 
                 FE = FExExamen(vecino, bloquesMod, AlumnosXPruebas, PruebasXAlumnos, examen) - resta;
-                Evaluacion FEv = FuncionEvaluacion(vecino, bloquesMod, AlumnosXPruebas, PruebasXAlumnos);
-                if (FEv < mejorFE){
-                    mejorFE = FEv;
+                
+                if (FE < mejorFE){
+                    mejorFE = FE;
                     mejorvecino = {examen, bloqueSig, salaSig};
                 }
             }
@@ -269,25 +347,58 @@ Movimiento iteracion( int NE, vector<map<int,bool>>& bloques, vector<map<int,boo
             if (verificarSalaValida(examen, salaActual, bloqueInv, Salas, AlumnosXPruebas, UsoSalas)){
                 vector<pair<int,int>> vecino = instancia;
                 vecino[examen] ={bloqueInv, salaActual};
-                FE = FExExamen(vecino, bloquesMod, AlumnosXPruebas, PruebasXAlumnos, examen) - resta ;
-                Evaluacion FEv = FuncionEvaluacion(vecino, bloquesMod, AlumnosXPruebas, PruebasXAlumnos);
-                if (FEv < mejorFE){
-                    mejorFE = FEv;
-                    mejorvecino = {examen, bloqueInv, salaActual};   // 0 o +1 (ciclo)}
+                
+                FE = FExExamen(vecino, bloquesMod, AlumnosXPruebas, PruebasXAlumnos, examen) - resta;
+                
+                if (FE < mejorFE){
+                    mejorFE = FE;
+                    mejorvecino = {examen, bloqueInv, salaActual};  
                 }
             }
             if (verificarSalaValida(examen, salaSig, bloqueInv, Salas, AlumnosXPruebas, UsoSalas)){
                 vector<pair<int,int>> vecino = instancia;
                 vecino[examen] = {bloqueInv, salaSig};
-                FE =  FExExamen(vecino, bloquesMod, AlumnosXPruebas, PruebasXAlumnos, examen)- resta;
-                Evaluacion FEv = FuncionEvaluacion(vecino, bloquesMod, AlumnosXPruebas, PruebasXAlumnos);
-                if (FEv < mejorFE){
-                    mejorFE = FEv;
+                
+                FE = FExExamen(vecino, bloquesMod, AlumnosXPruebas, PruebasXAlumnos, examen) - resta;
+                
+                if (FE < mejorFE){
+                    mejorFE = FE;
                     mejorvecino = {examen, bloqueInv, salaSig};
                 }
             }   
             bloquesMod[bloqueActual][examen]= true;
             bloquesMod[bloqueInv].erase(examen);
+        }
+        // mov 5 mov 6
+        bool bloqueAntVal = verificarBloqueValido(examen, bloqueAnt , AlumnosXPruebas, PruebasXAlumnos, instancia);
+        if (bloqueAntVal) {
+            bloquesMod[bloqueActual][examen] = false;
+            bloquesMod[bloqueAnt][examen] = true;
+            if (verificarSalaValida(examen, salaActual, bloqueAnt, Salas, AlumnosXPruebas, UsoSalas)) {
+                vector<pair<int,int>> vecino = instancia;
+                vecino[examen] = {bloqueAnt, salaActual};
+
+                FE = FExExamen(vecino, bloquesMod, AlumnosXPruebas, PruebasXAlumnos, examen) - resta;
+
+                if (FE < mejorFE) {
+                    mejorFE = FE;
+                    mejorvecino = {examen, bloqueAnt, salaActual};
+                }
+            }
+
+            if (verificarSalaValida(examen, salaSig, bloqueAnt, Salas, AlumnosXPruebas, UsoSalas)) {
+                vector<pair<int,int>> vecino = instancia;
+                vecino[examen] = {bloqueAnt, salaSig};
+
+                FE = FExExamen(vecino, bloquesMod, AlumnosXPruebas, PruebasXAlumnos, examen) - resta;
+
+                if (FE < mejorFE) {
+                    mejorFE = FE;
+                    mejorvecino = {examen, bloqueAnt, salaSig};
+                }
+            }
+            bloquesMod[bloqueActual][examen] = true;
+            bloquesMod[bloqueAnt].erase(examen);
         }
     }
 
@@ -335,13 +446,29 @@ Movimiento iteracion( int NE, vector<map<int,bool>>& bloques, vector<map<int,boo
     return mejorvecino;
 }
 
-vector<pair<int,int>> Resolver( int NE, const vector<vector<int>>& AlumnosXPruebas, const map<int, vector<int>>& PruebasXAlumnos, int NS, const vector<int>& Salas){
+vector<pair<int,int>> Resolver( int NE, const vector<vector<int>>& AlumnosXPruebas, const map<int, vector<int>>& PruebasXAlumnos, int NS, const vector<int>& Salas, int inicial, int archivoID, int maxIT){
     vector<map<int,bool>> UsoSalas(NS), bloques;
-    vector<pair<int,int>> instancia =
-        SolucionInicial(NE, bloques, UsoSalas, AlumnosXPruebas, PruebasXAlumnos, NS, Salas);
+    vector<pair<int,int>> instancia;
+    auto startInit = chrono::high_resolution_clock::now();
+    switch (inicial) {
+        case 1:
+            instancia = SolucionInicialGreedy(NE, bloques, UsoSalas, AlumnosXPruebas, PruebasXAlumnos, NS, Salas);
+            break;
+        case 2:
+            instancia = SolucionInicialNaive(NE, bloques, UsoSalas, AlumnosXPruebas, PruebasXAlumnos, NS, Salas);
+            break;
+        case 3:
+            instancia = SolucionInicialAleatorio(NE, bloques, UsoSalas, AlumnosXPruebas, PruebasXAlumnos, NS, Salas);
+            break;
+        default:
+            cout << "ERROR: numero de solucion inicial invalido" << endl;
+            exit(1);
+    }
+    auto endInit = chrono::high_resolution_clock::now();
+    double tiempoInicial = chrono::duration<double, milli>(endInit - startInit).count();
 
     vector<pair<int,int>> MejorInstancia = instancia;
-    vector<map<int,bool>> MejorBloques = bloques;    // ← AGREGADO
+    vector<map<int,bool>> MejorBloques = bloques;    
 
     Evaluacion FE = FuncionEvaluacion(instancia, bloques, AlumnosXPruebas, PruebasXAlumnos);
     Evaluacion MejorSol = FE;
@@ -351,8 +478,8 @@ vector<pair<int,int>> Resolver( int NE, const vector<vector<int>>& AlumnosXPrueb
     int tam = max(1, NE/2);
     deque<int> listaTabu;
 
-    const int MAX_ITER = 60;
-    for (int iter = 0; iter < MAX_ITER; ++iter) {
+    auto startIter = chrono::high_resolution_clock::now();
+    for (int iter = 0; iter < maxIT; ++iter) {
 
         Movimiento aplicado = iteracion(NE, bloques, UsoSalas, AlumnosXPruebas, PruebasXAlumnos, NS, Salas, instancia, listaTabu );
 
@@ -361,7 +488,7 @@ vector<pair<int,int>> Resolver( int NE, const vector<vector<int>>& AlumnosXPrueb
         if (FE < MejorSol) {
             MejorSol = FE;
             MejorInstancia = instancia;
-            MejorBloques = bloques;   // ← AGREGADO
+            MejorBloques = bloques;  
 
             cout << "Iter " << iter
                  << " - Nueva mejor FE = " << MejorSol.penalizacion
@@ -377,12 +504,15 @@ vector<pair<int,int>> Resolver( int NE, const vector<vector<int>>& AlumnosXPrueb
             listaTabu.pop_front();
         }
     }
+    auto endIter = chrono::high_resolution_clock::now();
+    double tiempoIter = chrono::duration<double, milli>(endIter - startIter).count();
+    guardarResultados( archivoID, inicial, tiempoInicial, tiempoIter, MejorSol.penalizacion,MejorBloques.size(), maxIT);
 
-    cout << "\nMejor FE final: " << MejorSol.penalizacion << " (bloques " << MejorBloques.size() << ")\n";   // ← usar MejorBloques
+    cout << "\nMejor FE final: " << MejorSol.penalizacion << " (bloques " << MejorBloques.size() << ")\n";  
     return MejorInstancia;
 }
 
-void LeerArchivo(string Nombre, string i){
+void LeerArchivo(string Nombre, string i, int Idarchivo, int iteraciones){
     ifstream in(Nombre);
     
     int NE;
@@ -391,8 +521,8 @@ void LeerArchivo(string Nombre, string i){
 
     cout<< " Numero de examenes: " << NE <<endl;
 
-    map<int, vector<int>> PruebasXAlumnos;   // id_alumno -> lista de pruebas
-    vector<vector<int>> AlumnosXPruebas(NE); // id_prueba -> lista de alumnos
+    map<int, vector<int>> PruebasXAlumnos;  
+    vector<vector<int>> AlumnosXPruebas(NE); 
 
     for (int e = 0; e < NE; e++) {
         string linea;
@@ -400,7 +530,7 @@ void LeerArchivo(string Nombre, string i){
         stringstream ss(linea);
         string idStr;
 
-        while (getline(ss, idStr, ',')) { // separar por comas
+        while (getline(ss, idStr, ',')) { 
             stringstream ss_id(idStr);
             int id;
             ss_id >> id;
@@ -419,28 +549,47 @@ void LeerArchivo(string Nombre, string i){
         in >> Salas[s];
     }
     in.close();
+    
+    
+    for (int n = 1; n <= 3; n++) {
+        vector<pair<int,int>> MejorInstancia = Resolver( NE, AlumnosXPruebas, PruebasXAlumnos, NS, Salas, n , Idarchivo , iteraciones);
+        string Salida = "";
+        switch (n) {
+            case 1: Salida = "salidasGreedy/i";break;
+            case 2: Salida = "salidasNaive/i";break;
+            case 3: Salida = "salidasAleatoria/i";break;
+        }
+        Salida += i + ".out";
+        ofstream out(Salida);
 
-    vector<pair<int,int>> MejorInstancia = Resolver( NE, AlumnosXPruebas, PruebasXAlumnos, NS, Salas );
+        for (int examen = 0; examen < MejorInstancia.size(); examen++) {
+            int bloque = MejorInstancia[examen].first;
+            int sala   = MejorInstancia[examen].second;
+            out << examen << " " << bloque << " " << sala << "\n";
+        }
 
-    string Salida = "instancias/i"; 
-    Salida += i + ".out";
-    ofstream out(Salida);
-
-    for (int examen = 0; examen < MejorInstancia.size(); examen++) {
-        int bloque = MejorInstancia[examen].first;
-        int sala   = MejorInstancia[examen].second;
-        out << examen << " " << bloque << " " << sala << "\n";
+        out.close();
     }
-
-    out.close();
 }
 
 int main() {
-    for (int i = 1; i <= 8; i++) {
-        cout << "archivo: "<< i <<endl;
-        string Nombre = "instancias/i"; 
-        Nombre += to_string(i) + ".in";
-        LeerArchivo(Nombre , to_string(i));
+    ofstream("Greedy.txt", ios::trunc).close();
+    ofstream("Naive.txt", ios::trunc).close();
+    ofstream("Aleatorio.txt", ios::trunc).close();
+    for (int m = 1 ;m <= 3; m++ ){
+        int iteraciones;
+        switch (m) {
+            case 1: iteraciones = 60; break;
+            case 2: iteraciones = 500; break;
+            case 3: iteraciones = 1000; break;
+        }
+        for (int i = 1; i <= 8; i++) {
+            cout << "archivo: "<< i <<endl;
+            string Nombre = "instancias/i";
+            Nombre += to_string(i) + ".in";
+            LeerArchivo(Nombre , to_string(i), i, iteraciones);
+        
+        }
     }
     return 0;
 }
