@@ -1,0 +1,481 @@
+\documentclass[letter, 10pt]{article}
+\usepackage[latin1]{inputenc}
+\usepackage[spanish]{babel}
+\usepackage{amsfonts}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{url}
+\usepackage[top=3cm,bottom=3cm,left=3.5cm,right=3.5cm,footskip=1.5cm,headheight=1.5cm,headsep=.5cm,textheight=3cm]{geometry}
+
+
+\begin{document}
+\title{Inteligencia Artificial \\ \begin{Large}Informe Final: Examination Timetabling Problem\end{Large}}
+\author{Benjam\'in Araos}
+\date{\today}
+\maketitle
+
+
+%--------------------No borrar esta secci\'on--------------------------------%
+\section*{Evaluaci\'on}
+
+\begin{tabular}{ll}
+C\'odigo Fuente (20\%): &  \underline{\hspace{2cm}}\\
+Resumen (2\%):  & \underline{\hspace{2cm}} \\
+Introducci\'on (3\%):  & \underline{\hspace{2cm}} \\
+Representaci\'on (10\%):  & \underline{\hspace{2cm}} \\
+Descripci\'on del algoritmo (20\%):  & \underline{\hspace{2cm}} \\
+Experimentos (10\%):  & \underline{\hspace{2cm}} \\
+Resultados (10\%):  & \underline{\hspace{2cm}} \\
+Conclusiones (20\%): &  \underline{\hspace{2cm}}\\
+Bibliograf\'ia (5\%): & \underline{\hspace{2cm}}\\
+ &  \\
+\textbf{Nota Final (100)}:   & \underline{\hspace{2cm}}
+\end{tabular}
+%---------------------------------------------------------------------------%
+
+\begin{abstract}
+El \textit{Examination Timetabling Problem} (ETP) es un problema de optimizaci\'on combinatoria que consiste en asignar un conjunto de ex\'amenes a bloques horarios y salas limitadas, sujeto a restricciones de capacidad y conflictos. Este trabajo presenta una revisi\'on exhaustiva del estado del arte, analizando su evoluci\'on desde los m\'etodos de coloraci\'on de grafos de 1960 hasta las metaheur\'isticas modernas. Como aporte principal, se propone e implementa un algoritmo de B\'usqueda Tab\'u para la variante \textit{Room-Capacitated}, dise\~nando operadores de vecindario espec\'ificos (movimientos espejo y cambios de sala) y una estrategia de evaluaci\'on incremental. Finalmente, se formula un modelo matem\'atico de programaci\'on lineal entera corregido para representar formalmente el problema y su espacio de b\'usqueda de orden exponencial $2^{n \cdot p \cdot m + t \cdot n\cdot 5}$.
+\end{abstract}
+
+\section{Introducci\'on}
+El \textit{Examination Timetabling Problem} (ETP) representa uno de los desaf\'ios log\'isticos m\'as cr\'iticos en la gesti\'on acad\'emica. En este documento se abordan los detalles de la variante \textit{Room-Capacitated}, la cual exige no s\'olo evitar conflictos horarios entre estudiantes, sino tambi\'en respetar rigurosamente las capacidades f\'isicas de las salas asignadas. El problema consiste en determinar el momento y lugar exacto para un conjunto de evaluaciones, minimizando la duraci\'on total del periodo de ex\'amenes.
+
+\subsection{Prop\'osito e Innovaci\'on}
+El prop\'osito de este trabajo es desarrollar una soluci\'on robusta basada en la metaheur\'istica de B\'usqueda Tab\'u que sea capaz de generar horarios factibles y compactos en tiempos de c\'omputo razonables. 
+La principal innovaci\'on de la propuesta radica en el dise\~no del vecindario de b\'usqueda: se introducen movimientos no convencionales, como el ``movimiento espejo'' (invertir el bloque horario de un examen), combinados con una estrategia de evaluaci\'on incremental (Delta Evaluation). Esto permite explorar el espacio de soluciones escapando eficientemente de \'optimos locales, una limitaci\'on com\'un en los enfoques constructivos tradicionales.
+
+\subsection{Estructura del Documento}
+El documento se encuentra organizado de la siguiente manera: En la Secci\'on 2, se define formalmente el problema, detallando sus variables y restricciones. La Secci\'on 3 presenta el estado del arte, revisando desde los or\'igenes hist\'oricos hasta las tendencias actuales en algoritmos de resoluci\'on. En la Secci\'on 4 se formula el modelo matem\'atico de programaci\'on lineal entera propuesto. Posteriormente, las Secciones 5 y 6 describen la representaci\'on de la soluci\'on y la implementaci\'on detallada del algoritmo de B\'usqueda Tab\'u, respectivamente. Finalmente, la Secci\'on 7 expone el dise\~no experimental, la Secci\'on 8 analiza los resultados obtenidos y la Secci\'on 9 presenta las conclusiones y trabajos futuros.
+\section{Definici\'on del Problema}
+
+El \textbf{Examination Timetabling Problem (ETP)} se define como la asignaci\'on de un conjunto de ex\'amenes a un n\'umero finito de bloques horarios y salas, satisfaciendo un conjunto de restricciones duras y blandas.
+
+\subsection{Componentes y Variables}
+La complejidad del problema surge de la interacci\'on entre sus cuatro componentes principales:
+\begin{itemize}
+    \item \textbf{Ex\'amenes ($E$):} Conjunto de pruebas a planificar. Cada examen tiene una lista de estudiantes inscritos.
+    \item \textbf{Estudiantes ($S$):} Conjunto de alumnos que generan las restricciones de conflicto (un alumno no puede estar en dos lugares a la vez).
+    \item \textbf{Bloques Horarios ($T$):} Periodos de tiempo discretos disponibles.
+    \item \textbf{Salas ($R$):} Espacios f\'isicos con una capacidad de aforo (asientos) definida.
+\end{itemize}
+
+\subsection{Dificultades y Complejidad}
+El ETP pertenece a la clase de problemas \textbf{NP-Duro} (NP-Hard) \cite{Garey1979}. Esto implica que no existe un algoritmo conocido que pueda encontrar la soluci\'on \'optima en tiempo polinomial para todas las instancias. Las principales dificultades incluyen:
+\begin{itemize}
+    \item \textbf{Densidad de Conflictos:} En instancias reales, la matriz de conflictos suele ser densa, lo que hace que encontrar siquiera una soluci\'on factible sea un desaf\'io similar al problema de coloraci\'on de grafos.
+    \item \textbf{Restricciones de Capacidad:} A diferencia del problema cl\'asico, la variante con capacidad limita severamente el n\'umero de ex\'amenes simult\'aneos, desconectando el espacio de b\'usqueda y dificultando la navegaci\'on entre soluciones vecinas.
+\end{itemize}
+
+\subsection{Variantes del Problema}
+Adem\'as de la variante estudiada, la literatura identifica otras formulaciones relevantes \cite{Qu2009}:
+\begin{itemize}
+    \item \textbf{Uncapacitated ETP:} Se asume que las salas tienen capacidad infinita. El problema se reduce a minimizar los bloques horarios respetando s\'olo conflictos de alumnos.
+    \item \textbf{Room-Capacitated ETP:} (Variante de este proyecto) Las salas tienen capacidades fijas y limitadas. Es la variante m\'as realista para la mayor\'ia de las instituciones.
+    \item \textbf{Slot-Capacitated ETP:} En lugar de salas espec\'ificas, se define una capacidad global m\'axima de alumnos por bloque horario.
+    \item \textbf{Split-Exams ETP:} Permite que un mismo examen se divida en m\'ultiples salas si supera la capacidad de una sola, a\~nadiendo una capa extra de complejidad a la asignaci\'on.
+\end{itemize}
+
+\section{Estado del Arte}
+
+\subsection{Or\'igenes Hist\'oricos}
+Los or\'igenes del Examination Timetabling Problem (ETP) se remontan a la d\'ecada de 1960, siendo uno de los primeros registros el trabajo de Gotlieb \cite{Gotlieb1962} que, aunque enfocado en horarios de clases, sent\'o las bases para los problemas de planificaci\'on educativa. Poco despu\'es, Cole \cite{Cole1964} present\'o uno de los primeros trabajos en abordar espec\'ificamente la programaci\'on de ex\'amenes usando m\'etodos computacionales. 
+
+Un avance significativo lleg\'o con Wood \cite{Wood1968}, quien desarroll\'o uno de los primeros algoritmos pr\'acticos para resolver problemas de gran tama\~{n}o utilizando el sistema Atlas. La base te\'orica se consolid\'o con Welsh y Powell \cite{Welsh1967}, estableciendo la conexi\'on fundamental entre la coloraci\'on de grafos y los problemas de planificaci\'on. Finalmente, Laporte y Desroches \cite{Laporte1984} en 1984 realizaron una revisi\'on extensa y describieron un procedimiento autom\'atico completo para la elaboraci\'on de horarios de ex\'amenes universitarios.
+
+\subsection{Evoluci\'on de M\'etodos de Soluci\'on}
+
+\subsubsection{M\'etodos Tradicionales (1960-1990)}
+Los primeros enfoques para resolver el ETP se basaron en m\'etodos exactos como t\'ecnicas de coloraci\'on de grafos \cite{Welsh1967}, que establecieron la conexi\'on fundamental entre ambos problemas. Sin embargo, la naturaleza NP-duro del ETP \cite{Garey1979} limit\'o severamente la aplicabilidad de estos m\'etodos a instancias peque\~nas, ya que para instancias grandes era imposible sacar buenos resultados en tiempo, no era escalable. 
+
+En la d\'ecada de 1980, las heur\'isticas constructivas (construyen soluci\'on desde cero) ganaron popularidad, destac\'andose algoritmos secuenciales \cite{Mehta1981} que asignaban ex\'amenes uno por uno seg\'un criterios de dificultad, y t\'ecnicas basadas en grafos m\'as sofisticadas \cite{deWerra1970}. Estos m\'etodos, aunque no garantizaban que sean los m\'as \'optimos, permit\'ian resolver instancias de tama\~no realista en tiempos computacionales razonables, mucho mejor que antes.
+
+\subsubsection{Era de las Metaheur\'isticas (1990-2010)}
+La d\'ecada de 1990 marc\'o un punto de inflexi\'on con la adopci\'on de metaheur\'isticas (sirve como gu\'ia para el proceso de b\'usqueda de soluciones) que demostraron superior efectividad en la exploraci\'on de espacios de b\'usqueda complejos:
+
+\begin{itemize}
+\item \textbf{Algoritmos Gen\'eticos} \cite{Erben2001}: Operan sobre una poblaci\'on de horarios, donde las instancias m\'as aptas son seleccionados para seguir avanzando. Utilizan operadores de cruce especializados que mantienen la factibilidad de los horarios y mutaciones que intercambian per\'iodos de ex\'amenes conflictivos, evolucionando iterativamente hacia soluciones de mayor calidad.
+
+\item \textbf{Recocido Simulado} \cite{Thompson1998}: Explora el espacio de horarios mediante movimientos que reubican ex\'amenes, aceptando ocasionalmente soluciones peores seg\'un un criterio probabil\'istico que disminuye con el tiempo. Esta caracter\'istica le permite escapar de \'optimos locales en la b\'usqueda de una distribuci\'on globalmente mejor de los ex\'amenes.
+
+\item \textbf{B\'usqueda Tab\'u} \cite{White1998}: Realiza una exploraci\'on local inteligente manteniendo una memoria de movimientos recientes (estas se guardan en una lista tab\'u) para evitar ciclos, como reasignar repetidamente el mismo examen a per\'iodos conflictivos. Incorpora estrategias de diversificaci\'on que reestructuran horarios con muchos conflictos estudiantiles, buscando mejoras en la distribuci\'on temporal de los ex\'amenes.
+
+\item \textbf{Algoritmos H\'ibridos} \cite{Burke2003}: Combinando las ventajas de m\'ultiples t\'ecnicas, como la rapidez de m\'etodos constructivos con el refinamiento de b\'usqueda local.
+\end{itemize}
+
+\subsection{International Timetabling Competition (ITC)}
+Las International Timetabling Competitions han sido fundamentales para estandarizar la investigaci\'on en el \'area y demostrar el progreso en el desarrollo de algoritmos, en esta se analizan y realizan tres problemas distintos entre ellos el Examination Timetabling Problem. La \textbf{ITC 2007} \cite{ITC2007} estableci\'o puntos de referencia estandarizados que permitieron la comparaci\'on de diferentes enfoques algor\'itmicos para el mismo problema. 
+
+Los m\'etodos ganadores en estas competencias compartieron caracter\'isticas como lo son:
+\begin{itemize}
+\item \textbf{B\'usqueda local inteligente}: Utiliza estructuras de vecindario especializadas y estrategias con memoria, como la b\'usqueda tab\'u, para explorar eficientemente el espacio de soluciones evitando ciclos y escapes de \'optimos locales.
+
+\item \textbf{Mecanismos adaptativos}: Incorporan estrategias que ajustan autom\'aticamente sus par\'ametros durante la ejecuci\'on en funci\'on del comportamiento de la b\'usqueda, mejorando el rendimiento en diferentes instancias del problema.
+
+\item \textbf{Enfoques h\'ibridos}: Combinan m\'ultiples metaheur\'isticas, aprovechando las fortalezas de cada una para lograr un balance \'optimo.
+\end{itemize}
+
+\subsection{Tendencias Actuales y Mejores Resultados}
+
+Las tendencias actuales reflejan la evoluci\'on hacia m\'etodos m\'as sofisticados y automatizados:
+
+\begin{itemize}
+    \item \textbf{Optimizaci\'on Multi-objetivo:} Tan et al. \cite{Tan2021} destacan enfoques que optimizan simult\'aneamente m\'ultiples criterios (ej. uso de salas y preferencia de alumnos) sin combinarlos en una sola funci\'on de costo lineal.
+    \item \textbf{B\'usqueda Local Adaptativa:} Ceschia et al. \cite{Ceschia2023} describen algoritmos que modifican din\'amicamente sus operadores de vecindario seg\'un el progreso de la b\'usqueda, eliminando la necesidad de ajuste manual de par\'ametros.
+    \item \textbf{Hiperheur\'isticas:} Burke et al. \cite{Burke2013} proponen m\'etodos que ``eligen qu\'e heur\'istica aplicar'' en cada momento, elevando el nivel de abstracci\'on de la soluci\'on.
+\end{itemize}
+
+Los \textbf{algoritmos m\'as exitosos} en la literatura reciente suelen seguir una estructura h\'ibrida que consiste en:
+
+\begin{itemize}
+\item \textbf{Fase constructiva} basada en reglas heur\'isticas informadas por el dominio, incorporando conocimiento espec\'ifico sobre conflictos estudiantiles.
+
+\item \textbf{Fase de mejora} mediante b\'usqueda local inteligente con operadores adaptativos que seleccionan autom\'aticamente los movimientos m\'as prometedores.
+
+\item \textbf{Mecanismos de diversificaci\'on} avanzados \cite{Kendall2020} para evitar estancamiento en \'optimos locales, incluyendo reinicios adaptativos y estrategias de aceptaci\'on por umbrales din\'amicos.
+\end{itemize}
+
+La competencia ITC 2019 \cite{ITC2019} ha continuado esta tradici\'on, enfoc\'andose en problemas de programaci\'on de horarios universitarios del mundo real, impulsando el desarrollo de algoritmos m\'as robustos y adaptativos capaces de manejar las complejidades crecientes de las instituciones educativas modernas.
+
+La \textbf{tendencia actual} favorece algoritmos adaptativos que seleccionan autom\'aticamente los operadores m\'as prometedores durante la b\'usqueda, demostrando superior rendimiento en instancias complejas y variadas del ETP, con un creciente enfoque en la integraci\'on de aprendizaje autom\'atico y meta-aprendizaje para recomendar las mejores metaheur\'isticas y configuraciones de par\'ametros para instancias espec\'ificas.
+
+\section{Modelo Matem\'atico}
+
+A continuaci\'on se presenta el modelo de programaci\'on lineal entera para la variante \textit{Room-Capacitated}.
+
+\subsection{Par\'ametros}
+
+\begin{itemize}
+\item $p$: N\'umero de ex\'amenes a realizar.
+\item $m$: N\'umero de salas disponibles.
+\item $t$: N\'umero de alumnos.
+\item $C_k$: Capacidad de la sala $k$, para $k = 1, \dots, m$.
+\item $P_{j,a}$: 1 si el alumno $a$ debe realizar el examen $j$, 0 si no.
+\item $T_j = \sum_{a=1}^t P_{j,a}$: N\'umero de alumnos que realizan el examen $j$.
+\item $w_d$: Penalizaci\'on por tener ex\'amenes con separaci\'on $d-1$ bloques.
+\end{itemize}
+
+\subsection{Variables de Decisi\'on}
+
+\begin{itemize}
+\item $X_{i,j,k} \in \{0,1\}$: 1 si el examen $j$ se asigna al bloque $i$ en la sala $k$, 0 si no
+\item $Y_{a,i,d} \in \{0,1\}$: 1 si el alumno $a$ tiene dos ex\'amenes con separaci\'on $d$ empezando en el bloque $i$, 0 si no
+\end{itemize}
+
+\subsection{Objetivos}
+
+\subsubsection{Objetivo Principal: Minimizaci\'on de Bloques}
+El objetivo es compactar el horario. Matem\'aticamente, esto se modela minimizando la suma ponderada de las asignaciones por su posici\'on temporal, lo que empuja los ex\'amenes hacia los primeros bloques:
+
+\[
+\min z_1 = \sum_{i=1}^n \sum_{j=1}^p \sum_{k=1}^m i \cdot X_{i,j,k}
+\]
+
+\subsubsection{Objetivo Secundario: Penalizaci\'on por Proximidad}
+Minimizar la incomodidad para los estudiantes debido a ex\'amenes consecutivos o muy cercanos, se usa como desempate:
+
+\[
+\min z_2 = \sum_{a=1}^t \sum_{i=1}^{n-1} \sum_{d=1}^{5} w_d \cdot Y_{a,i,d}
+\]
+Donde $w_d \in \{16, 8, 4, 2, 1\}$ son los pesos est\'andar para separaciones de 0 a 4 bloques libres.
+
+\subsection{Restricciones}
+
+\subsubsection{Asignaci\'on \'Unica (Hard)}
+\[
+\sum_{i=1}^n \sum_{k=1}^m X_{i,j,k} = 1 \quad \forall j \in E
+\]
+
+\subsubsection{Capacidad de Sala (Hard)}
+\[
+T_j \cdot X_{i,j,k} \leq C_k \quad \forall i,j,k
+\]
+Donde $T_j$ es el n\'umero de alumnos inscritos en el examen $j$ y $C_k$ la capacidad de la sala $k$.
+
+\subsubsection{Conflicto de Estudiantes (Hard)}
+\[
+\sum_{j=1}^p \sum_{k=1}^m P_{j,a} \cdot X_{i,j,k} \leq 1 \quad \forall i \in T, \forall a \in S
+\]
+Un estudiante $a$ no puede tener m\'as de un examen en el mismo bloque $i$.
+
+\subsection{Espacio de B\'usqueda}
+El tama\~no del espacio de b\'usqueda se determina por las combinaciones posibles de asignaci\'on. Para la variable principal $X_{i,j,k}$, el espacio te\'orico es $2^{n \cdot p \cdot m}$. Al considerar las variables auxiliares $Y$, el espacio total explota a $2^{n \cdot p \cdot m + t \cdot n \cdot 5}$. Esta magnitud exponencial justifica plenamente el uso de metaheur\'isticas como Tabu Search en lugar de solucionadores exactos (como Simplex o Branch \& Bound) para instancias reales.
+
+\section{Representaci\'on}
+Para el dise\~no de la soluci\'on, se descart\'o el uso de las matrices tridimensionales dispersas ($X_{i,j,k}$) propuestas en el modelo matem\'atico, optando por una representaci\'on directa y compacta que reduce significativamente el consumo de memoria y facilita la manipulaci\'on de soluciones.
+
+La estructura principal se define como un vector de pares ordenados de longitud $N$, donde $N$ corresponde a la cantidad total de ex\'amenes a planificar. En esta representaci\'on, el \'indice $j$ del vector identifica de forma \'unica al examen $j$ (para $j = 0, \dots, N-1$).
+
+Cada elemento del vector contiene un par de valores enteros $(b, s)$, interpretados de la siguiente manera:
+\begin{itemize}
+    \item \textbf{Primer componente ($b$):} Representa el bloque horario asignado al examen.
+    \item \textbf{Segundo componente ($s$):} Representa la sala asignada al examen.
+\end{itemize}
+
+De esta forma, existe una relaci\'on uno a uno entre la estructura de datos y la soluci\'on f\'isica: si la posici\'on $j$ contiene el par $(3, 5)$, implica que el examen $j$ se rendir\'a en el bloque 3 dentro de la sala 5.
+
+\begin{figure}[h!]
+    \centering
+    \begin{tabular}{|c|c|c|c|c|}
+        \hline
+        \textbf{\'Indice (Examen ID)} & 0 & 1 & 2 & ... \\ \hline
+        \textbf{Valor (Bloque, Sala)} & (3, 1) & (0, 2) & (5, 1) & ... \\ \hline
+    \end{tabular}
+    \caption{Esquema del vector de soluci\'on: El \'Indice representa el examen y el contenido su asignaci\'on.}
+    \label{fig:representacion}
+\end{figure}
+
+\subsection{Justificaci\'on de la Representaci\'on}
+Esta representaci\'on es apropiada para el problema por las siguientes razones:
+\begin{enumerate}
+    \item \textbf{Eficiencia Espacial:} Reduce la complejidad espacial de $O(N \cdot \text{Bloques} \cdot \text{Salas})$ (del modelo binario) a $O(N)$, eliminando el almacenamiento de ceros innecesarios.
+    \item \textbf{Acceso Directo:} Permite consultar o modificar la asignaci\'on de cualquier examen en tiempo constante $O(1)$, lo cual es crucial para la eficiencia de los movimientos en la B\'usqueda Tab\'u.
+    \item \textbf{Manejo de Restricciones:} Se complementa con estructuras auxiliares (matrices de ocupaci\'on de salas y listas de adyacencia de alumnos) que permiten verificar la factibilidad de un movimiento sin necesidad de recalcular toda la soluci\'on, agilizando la evaluaci\'on del vecindario.
+\end{enumerate}
+
+\section{Descripci\'on del algoritmo}
+La soluci\'on implementada se basa en la metaheur\'istica de B\'usqueda Tab\'u (Tabu Search). Este m\'etodo de b\'usqueda local explora el espacio de soluciones movi\'endose iterativamente desde una soluci\'on actual a la mejor soluci\'on de su vecindario, utilizando una memoria de corto plazo (lista tab\'u) para evitar ciclos y escapar de \'optimos locales.
+
+\subsection{Estructura General y Pseudoc\'odigo}
+El algoritmo sigue un esquema cl\'asico de optimizaci\'on iterativa. En cada paso, para cada examen no tab\'u, se eval\'uan espec\'ificamente movimientos de avance, retroceso y espejo en el tiempo, considerando variaciones en la sala asignada.
+
+A continuaci\'on se presenta el pseudoc\'odigo que resume la l\'ogica implementada en la funci\'on principal \texttt{Resolver}:
+
+\begin{verbatim}
+Entrada: Instancia del problema (Examenes, Salas, Alumnos)
+Salida: Mejor asignacion encontrada
+
+1. SolucionActual <- GenerarSolucionInicial(EstrategiaSeleccionada)
+2. MejorSolucion <- SolucionActual
+3. ListaTabu <- Vacia()
+4. Iteracion <- 0
+
+5. Mientras Iteracion < MaxIteraciones hacer:
+6.    MejorVecino <- Nulo
+7.    Para cada examen e en Examenes hacer:
+8.        Si e no esta en ListaTabu entonces:
+9.            // Generar vecinos especificos (Avance, Retroceso, Espejo)
+10.           Vecinos <- CalcularVecinosFactibles(e, SolucionActual)
+11.           Para cada v en Vecinos hacer:
+12.               Delta <- CalcularDeltaPenalizacion(v, SolucionActual)
+13.               Si v es mejor que MejorVecino entonces:
+14.                   MejorVecino <- v
+15.                   MovimientoRealizado <- e
+16.    
+17.    Si MejorVecino existe entonces:
+18.        SolucionActual <- MejorVecino
+19.        ActualizarListaTabu(MovimientoRealizado)
+20.        Si SolucionActual es mejor que MejorSolucion entonces:
+21.            MejorSolucion <- SolucionActual
+22.    
+23.    Iteracion <- Iteracion + 1
+
+24. Retornar MejorSolucion
+\end{verbatim}
+
+\subsection{Inicializaci\'on}
+Para evaluar el impacto de la soluci\'on de partida en la convergencia del algoritmo, se implementaron y compararon tres mecanismos de generaci\'on de soluciones iniciales. Todas las estrategias garantizan la factibilidad de las restricciones duras (capacidad y conflictos) desde el primer momento.
+
+\begin{enumerate}
+    \item \textbf{Inicializaci\'on Secuencial Simple (Naive):}
+    Esta estrategia asigna cada examen a un bloque horario distinto de forma secuencial (el $i$-\'esimo examen al bloque $i$), buscando luego la primera sala capaz de albergarlo. Aunque genera soluciones de muy baja calidad con una excesiva cantidad de bloques, esta t\'ecnica es fundamental como l\'inea base para validar la capacidad de compactaci\'on de algoritmos m\'as complejos \cite{Qu2009}.
+    Esta t\'ecnica genera soluciones iniciales de muy baja calidad (con una cantidad de bloques igual a la cantidad de ex\'amenes), pero sirve como l\'inea base para verificar la capacidad del algoritmo de ``comprimir'' el horario dr\'asticamente.
+    
+    \item \textbf{Inicializaci\'on Voraz (Greedy):}
+    Busca generar una soluci\'on compacta desde el inicio. Recorre los ex\'amenes secuencialmente y, para cada uno, intenta asignarlo en el primer bloque posible (comenzando desde el bloque 0) y la primera sala v\'alida encontrada.
+    Esta estrategia produce soluciones con una funci\'on objetivo inicial mucho mejor que la secuencial, reduciendo el trabajo necesario en la fase de optimizaci\'on.
+    
+    \item \textbf{Inicializaci\'on Aleatoria Factible:}
+    Asigna cada examen a un bloque y una sala seleccionados al azar. Si la asignaci\'on aleatoria viola alguna restricci\'on (conflicto o capacidad), se repite el intento hasta encontrar una posici\'on v\'alida.
+    Este m\'etodo es fundamental para explorar diversas regiones del espacio de b\'usqueda y evitar que el algoritmo determinista quede atrapado siempre en el mismo \'optimo local al partir siempre de la misma configuraci\'on.
+\end{enumerate}
+
+\subsection{Definici\'on de Movimientos y Vecindario}
+El n\'ucleo de la b\'usqueda radica en c\'omo se generan los vecinos. En cada iteraci\'on, el algoritmo intenta modificar la asignaci\'on de un examen $e$ aplicando uno de los siguientes operadores de movimiento. Para cada examen, se intentan hasta 6 variantes (3 movimientos temporales $\times$ 2 opciones de sala):
+
+\begin{enumerate}
+    \item \textbf{Avance de Bloque ($t+1$):} Se intenta mover el examen $e$ del bloque actual $t$ al bloque siguiente $t+1$. Este movimiento busca compactar el horario llenando huecos vac\'ios posteriores.
+    \item \textbf{Retroceso de Bloque ($t-1$):} Se intenta mover el examen $e$ al bloque anterior $t-1$. Este movimiento es crucial para reducir la duraci\'on total del periodo de ex\'amenes, tratando de traer ex\'amenes tard\'ios a bloques m\'as tempranos.
+    \item \textbf{Movimiento Espejo ($N_{bloques}-1-t$):} Se traslada el examen $e$ a su posici\'on ``invertida'' en el horizonte temporal. Este operador fomenta la diversificaci\'on (saltos grandes) para sacar ex\'amenes de zonas localmente congestionadas.
+\end{enumerate}
+
+Para cada uno de estos movimientos temporales, se eval\'uan dos posibilidades espaciales: mantener la sala actual o asignar una nueva sala aleatoria. Esto permite resolver conflictos de capacidad que de otra forma impedir\'ian el cambio de bloque.
+
+\subsection{Funci\'on de Evaluaci\'on}
+La calidad de una soluci\'on se mide mediante una funci\'on de costo jer\'arquica que gu\'ia la b\'usqueda hacia los objetivos del problema. El operador de comparaci\'on prioriza estrictamente la cantidad de bloques utilizados y, en caso de empate, minimiza la penalizaci\'on secundaria.
+
+\begin{equation}
+    F(S) = \langle |B|, P_{total} \rangle
+\end{equation}
+
+Donde $|B|$ es el n\'umero de bloques. La penalizaci\'on secundaria $P_{total}$ se compone de dos factores:
+\begin{enumerate}
+    \item \textbf{Factor de Posici\'on:} Se suma el \'indice del bloque asignado a cada examen ($\sum bloque_j$). Este t\'ermino act\'ua como un gradiente suave que empuja constantemente a todos los ex\'amenes hacia el tiempo $t=0$, favoreciendo la compactaci\'on.
+    \item \textbf{Factor de Proximidad:} Se penaliza la cercan\'ia de ex\'amenes para un mismo alumno con pesos decrecientes $\{16, 8, 4, 2, 1\}$ para separaciones de 0 a 4 bloques respectivamente.
+\end{enumerate}
+
+\subsection{Optimizaci\'on por Evaluaci\'on Incremental}
+Uno de los desaf\'ios computacionales de la B\'usqueda Tab\'u es el alto costo de evaluar todo el vecindario en cada iteraci\'on. Si se calculara la Funci\'on de Evaluaci\'on completa ($O(N)$) para cada movimiento candidato, el tiempo de ejecuci\'on crecer\'ia linealmente con el tama\~no de la instancia, volviendo al algoritmo ineficiente.
+
+Para mitigar esto, se implement\'o una estrategia de \textbf{Evaluaci\'on Incremental} (Delta Evaluation). Esta t\'ecnica se basa en la premisa de que el movimiento de un solo examen $e$ no afecta la penalizaci\'on de los ex\'amenes que no est\'an relacionados con \'el ni temporalmente ni por conflictos de alumnos.
+
+En lugar de recalcular la penalizaci\'on total desde cero, el algoritmo calcula exclusivamente el costo local asociado al examen $e$ antes y despu\'es del movimiento, obteniendo la variaci\'on $\Delta$. De esta manera, la nueva evaluaci\'on global se estima como $FE_{global} + \Delta$. Esta optimizaci\'on reduce dr\'asticamente la complejidad computacional de la exploraci\'on del vecindario.
+
+\subsection{Manejo de la Lista Tab\'u}
+La lista tab\'u se implementa como una cola FIFO (\texttt{deque}) de tama\~no din\'amico, proporcional a la instancia ($N/2$). Cuando un examen es movido, su identificador ingresa a la lista y se le ``proh\'ibe'' ser seleccionado para un nuevo movimiento durante un n\'umero de iteraciones igual al tama\~no de la lista. Esto previene que el algoritmo revierta inmediatamente un cambio (ciclado), forz\'andolo a explorar nuevas configuraciones.
+
+\section{Experimentos}
+
+\subsection{Objetivos de la Experimentaci\'on}
+El dise\~no experimental tiene como objetivo evaluar el desempe\~no y la robustez del algoritmo de B\'usqueda Tab\'u bajo diferentes condiciones iniciales y horizontes de ejecuci\'on. Se busca responder a dos preguntas fundamentales:
+\begin{enumerate}
+    \item \textbf{Impacto de la Inicializaci\'on:} ?`Cu\'anto influye la calidad de la soluci\'on inicial (Greedy vs. Aleatoria vs. Naive) en la calidad final tras aplicar la metaheur\'istica?
+    \item \textbf{An\'alisis de Convergencia:} ?`Es suficiente un n\'umero bajo de iteraciones (60) para encontrar \'optimos locales de calidad, o se requiere una exploraci\'on profunda (1.000 iteraciones) para salir de estancamientos en instancias complejas?
+\end{enumerate}
+
+\subsection{Instancias de Prueba}
+Se utilizaron 8 instancias estandarizadas (\texttt{i1.in} a \texttt{i8.in}). Estas var\'ian en densidad de conflictos, n\'umero de alumnos y disponibilidad de salas, ofreciendo un espectro representativo de dificultad. 
+
+Las instancias se encuentran disponibles en el siguiente repositorio:
+
+\url{https://github.com/benjacha/ETP-Tabu-Search/tree/main/codigo/Instancias}
+\begin{itemize}
+    \item \texttt{i1.in}: N\'umero de ex\'amenes: 607, N\'umero de Salas: 7
+    \item \texttt{i2.in}: N\'umero de ex\'amenes: 870, N\'umero de Salas: 49
+    \item \texttt{i3.in}: N\'umero de ex\'amenes: 934, N\'umero de Salas: 48
+    \item \texttt{i4.in}: N\'umero de ex\'amenes: 273, N\'umero de Salas: 1
+    \item \texttt{i5.in}: N\'umero de ex\'amenes: 1017, N\'umero de Salas: 3
+    \item \texttt{i6.in}: N\'umero de ex\'amenes: 242, N\'umero de Salas: 8
+    \item \texttt{i7.in}: N\'umero de ex\'amenes: 1096, N\'umero de Salas: 15
+    \item \texttt{i8.in}: N\'umero de ex\'amenes: 587, N\'umero de Salas: 8
+\end{itemize}
+
+\subsection{Entorno de Hardware y Software}
+Los experimentos fueron ejecutados en un entorno controlado con las siguientes caracter\'isticas:
+\begin{itemize}
+    \item \textbf{Lenguaje:} C++ (Est\'andar C++11), utilizando la librer\'ia \texttt{chrono} para mediciones de tiempo de alta precisi\'on.
+    \item \textbf{Compilador:} G++ sin banderas de optimizaci\'on agresivas para asegurar la estabilidad de la medici\'on.
+    \item \textbf{Equipo:} AMD Ryzen 7 9700X 8-Core, 16GB RAM.
+\end{itemize}
+
+\subsection{Configuraci\'on de Par\'ametros}
+Para asegurar la reproducibilidad, se definieron los siguientes par\'ametros fijos y variables:
+
+\begin{itemize}
+    \item \textbf{Funci\'on Objetivo:} Pesos de penalizaci\'on $w_d = \{16, 8, 4, 2, 1\}$ para distancias de 0 a 4 bloques.
+    \item \textbf{Lista Tab\'u:} Din\'amica, calculada como $\max(1, NE/2)$.
+    \item \textbf{Variables de Control (Iteraciones):} Se definieron tres escenarios de profundidad de b\'usqueda para evaluar la convergencia:
+    \begin{itemize}
+        \item \textbf{Corto Plazo:} 60 iteraciones.
+        \item \textbf{Mediano Plazo:} 500 iteraciones.
+        \item \textbf{Largo Plazo:} 1.000 iteraciones.
+    \end{itemize}
+\end{itemize}
+ donde cada una de las 8 instancias fue resuelta utilizando las 3 estrategias de inicializaci\'on (Greedy, Naive, Aleatoria) y sometida a los 3 niveles de profundidad de iteraci\'on.
+Se registraron m\'etricas de Tiempo de Inicializaci\'on ($T_{init}$), Tiempo de B\'usqueda ($T_{search}$), Penalizaci\'on Final y Cantidad de Bloques utilizados. Los resultados se almacenaron en archivos de registro diferenciados (\texttt{Greedy.txt}, \texttt{Naive.txt}, \texttt{Aleatorio.txt}) para su posterior an\'alisis.
+
+\section{Resultados}
+
+Esta secci\'on presenta el an\'alisis de rendimiento del algoritmo de B\'usqueda Tab\'u, evaluando la evoluci\'on de la calidad de la soluci\'on y el uso de recursos a trav\'es de tres horizontes de ejecuci\'on: corto plazo (60 iteraciones), mediano plazo (500 iteraciones) y largo plazo (1000 iteraciones).
+
+\subsection{Evoluci\'on de la Minimizaci\'on de Recursos (Bloques)}
+El primer desaf\'io del algoritmo es compactar el horario para utilizar la menor cantidad de bloques posibles.
+
+\begin{figure}[h!]
+    \centering
+    \begin{minipage}{0.48\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{bloques_60.pdf}
+        \caption{Bloques a 60 Iteraciones.}
+        \label{fig:bloques60}
+    \end{minipage}\hfill
+    \begin{minipage}{0.48\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{bloques_1000.pdf}
+        \caption{Bloques a 1000 Iteraciones.}
+        \label{fig:bloques1000}
+    \end{minipage}
+\end{figure}
+
+La comparativa entre la Figura \ref{fig:bloques60} y la Figura \ref{fig:bloques1000} revela una din\'amica interesante:
+\begin{itemize}
+    \item \textbf{Convergencia R\'apida de Greedy y Aleatorio:} Ya a las 60 iteraciones, las estrategias Greedy (azul) y Aleatoria (verde) logran niveles de compactaci\'on muy altos. El aumento a 1000 iteraciones s\'olo refina marginalmente este aspecto en las instancias m\'as dif\'iciles.
+    \item \textbf{Estancamiento de Naive:} La estrategia Naive (naranja) comienza con un exceso masivo de bloques. Aunque logra reducir su uso al pasar de 60 a 1000 iteraciones (note la pendiente descendente en las instancias centrales), \textbf{no logra converger} a la calidad de las otras estrategias, qued\'andose atrapada en \'optimos locales con cientos de bloques extra.
+\end{itemize}
+
+\subsection{Evoluci\'on de la Calidad de Soluci\'on (Penalizaci\'on)}
+Una vez estabilizado el n\'umero de bloques, el algoritmo se enfoca en minimizar la penalizaci\'on por proximidad de ex\'amenes.
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=0.48\textwidth]{costo_500.pdf}
+    \includegraphics[width=0.48\textwidth]{costo_1000.pdf}
+    \caption{Comparativa de Penalizaci\'on: Mediano Plazo (500 iters) vs Largo Plazo (1000 iters).}
+    \label{fig:costos_evolucion}
+\end{figure}
+
+Las Figuras \ref{fig:costos_evolucion} muestran el refinamiento fino de la soluci\'on:
+\begin{itemize}
+    \item \textbf{Greedy (Azul):} Se mantiene como la l\'inea base de mejor calidad (m\'as baja) consistentemente. Su estabilidad entre 500 y 1000 iteraciones sugiere que encuentra buenas soluciones muy r\'apido.
+    \item \textbf{Recuperaci\'on de Aleatorio (Verde):} Es notable c\'omo la estrategia Aleatoria, que a las 60 iteraciones ten\'ia un desempe\~no variable, para las 500 iteraciones ya ha logrado \emph{casi} empatar con Greedy en varias instancias (ej. instancias 1, 4, 6). Esto valida la capacidad de la B\'usqueda Tab\'u para corregir una mala inicializaci\'on si se le da suficiente tiempo.
+    \item \textbf{Naive (Naranja):} Aunque mejora, sigue siendo la peor opci\'on por un margen amplio, validando que una mala estructura inicial impone un "techo" a la calidad m\'axima alcanzable.
+\end{itemize}
+
+\subsection{An\'alisis de Costo Computacional}
+Finalmente, se contrasta el costo temporal de las estrategias para determinar si la complejidad de la inicializaci\'on Greedy justifica su uso.
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=0.7\textwidth]{tiempo_total_1000.pdf}
+    \caption{Tiempo Total de Ejecuci\'on (Inicializaci\'on + 1000 Iteraciones).}
+    \label{fig:tiempo_total}
+\end{figure}
+
+La Figura \ref{fig:tiempo_total} ilustra los tiempos totales de ejecuci\'on. Para un an\'alisis m\'as detallado, la Tabla \ref{tab:tiempos_detalle} desglosa el impacto porcentual de la fase de inicializaci\'on sobre el tiempo total promedio.
+
+\begin{table}[h!]
+\centering
+\begin{tabular}{|l|c|c|c|}
+\hline
+\textbf{M\'etodo} & \textbf{T. Inicial (ms)} & \textbf{T. Total (ms)} & \textbf{\% del Total} \\ \hline
+Greedy    & 1769.66 & 115052.24 & 1.54\% \\ \hline
+Naive     & 0.26    & 218522.14 & 0.00\% \\ \hline
+Aleatorio & 164.78  & 188582.51 & 0.09\% \\ \hline
+\end{tabular}
+\caption{Comparativa de tiempos promedio a 1000 iteraciones.}
+\label{tab:tiempos_detalle}
+\end{table}
+
+Los resultados son contundentes y revelan un fen\'omeno interesante:
+\begin{enumerate}
+    \item \textbf{Costo despreciable:} Aunque la inicializaci\'on \textbf{Greedy} es la m\'as lenta en t\'erminos absolutos ($\approx 1.77$ segundos), este costo representa apenas un \textbf{1.54\%} del tiempo total de ejecuci\'on, lo cual es marginal.
+    \item \textbf{Eficiencia Global:} Sorprendentemente, la estrategia Greedy result\'o tener el \textbf{menor tiempo total} de ejecuci\'on promedio ($\approx 115$ segundos), superando ampliamente a la estrategia Naive ($\approx 218$ segundos) y a la Aleatoria ($\approx 188$ segundos).
+\end{enumerate}
+
+Esto sugiere que partir de una buena soluci\'on no s\'olo mejora la calidad final, sino que tambi\'en \textbf{acelera el proceso de b\'usqueda}, posiblemente porque el algoritmo pierde menos tiempo evaluando movimientos en vecindarios de baja calidad o reparando infactibilidades complejas. En conclusi\'on, la estrategia Greedy es dominante en todos los aspectos: calidad, uso de recursos y eficiencia temporal.
+\section{Conclusiones}
+El presente estudio abord\'o la resoluci\'on del \textit{Examination Timetabling Problem} en su variante \textit{Room-Capacitated} mediante una metaheur\'istica de B\'usqueda Tab\'u. Tras analizar el comportamiento del algoritmo bajo tres estrategias de inicializaci\'on y diferentes horizontes de b\'usqueda, se presentan las siguientes conclusiones:
+
+\subsection{Adecuaci\'on de la Propuesta}
+La implementaci\'on de la B\'usqueda Tab\'u con representaci\'on vectorial y operadores de vecindario especializados (movimientos espejo y evaluaci\'on incremental) demostr\'o ser altamente efectiva para este problema NP-Duro. El algoritmo logr\'o no solo encontrar soluciones factibles para todas las instancias, sino tambi\'en reducir dr\'asticamente el n\'umero de bloques horarios utilizados, validando la hip\'otesis de que una exploraci\'on local inteligente puede superar las limitaciones de los m\'etodos constructivos puros.
+
+\subsection{Ventajas y Desventajas}
+Basado en la evidencia experimental, se identifican las siguientes fortalezas y debilidades de la propuesta:
+
+\textbf{Ventajas:}
+\begin{itemize}
+    \item \textbf{Eficiencia de la Inicializaci\'on Greedy:} Los resultados confirman que la estrategia Greedy es dominante. A pesar de tener un costo inicial de ~1.7 segundos (frente a los milisegundos de Naive), esta inversi\'on permite reducir el tiempo total de ejecuci\'on en casi un 50\% (115s vs 218s) y alcanzar calidades de soluci\'on inalcanzables para las otras estrategias.
+    \item \textbf{Capacidad de Recuperaci\'on:} La estrategia de inicializaci\'on Aleatoria demostr\'o que el algoritmo tiene una robusta capacidad de mejora, logrando equiparar la calidad de Greedy en instancias medianas tras 500 iteraciones, lo que habla bien de la capacidad de diversificaci\'on de los movimientos implementados.
+\end{itemize}
+
+\textbf{Desventajas:}
+\begin{itemize}
+    \item \textbf{Dependencia de la Estructura Inicial:} En las instancias m\'as complejas (i7, i8), el algoritmo no logr\'o corregir completamente las deficiencias de una mala inicializaci\'on (Naive) dentro del l\'imite de 1000 iteraciones, sugiriendo que la B\'usqueda Tab\'u por s\'i sola puede tener dificultades para "reconstruir" una soluci\'on estructuralmente deficiente.
+    \item \textbf{Escalabilidad del Vecindario:} Aunque la evaluaci\'on incremental mitiga el costo, el an\'alisis exhaustivo del vecindario sigue siendo el cuello de botella, consumiendo el 98\% del tiempo de c\'omputo.
+\end{itemize}
+
+\subsection{Trabajo Futuro}
+Para futuras investigaciones, se propone explorar mecanismos de \textbf{B\'usqueda Tab\'u Reactiva}, donde el tama\~no de la lista tab\'u se ajuste din\'amicamente en funci\'on de la repetici\'on de soluciones, para evitar el estancamiento observado en la estrategia Naive. Asimismo, la integraci\'on de una fase de \textbf{Reencadenamiento de Trayectorias (Path Relinking)} podr\'ia permitir combinar las mejores caracter\'isticas de soluciones Greedy y Aleatorias, robusteciendo la b\'usqueda en instancias de gran escala.
+\bibliographystyle{plain}
+\bibliography{Referencias}
+
+\end{document} 
