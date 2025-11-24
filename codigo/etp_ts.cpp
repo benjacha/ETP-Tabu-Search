@@ -9,21 +9,35 @@
 #include <ctime>
 #include <deque>
 #include <chrono>
-#include <climits> // INT_MAX
+#include <climits>
+
 using namespace std;
 
 
+// =============================================================================
+// ESTRUCTURAS DE DATOS
+// =============================================================================
+
+/*
+Representa un movimiento de un examen a otro bloque y/o sala
+*/
 struct Movimiento {
     int examen;
     int Bloque; // +1 o -1
     int Sala;   // 0 o +1 (ciclo)
 };
 
+/**
+ * Representa un movimiento de un examen a otro bloque y/o sala
+ */
 struct Evaluacion {
-    int bloques;        // objetivo principal
-    int penalizacion;   // objetivo secundario
+    int bloques;        // objetivo principal - cantidad de bloques utilizados
+    int penalizacion;   // objetivo secundario - penalización por proximidad + bloques en el que estan
 };
 
+/**
+ * Representa la evaluación de una solución (función objetivo)
+ */
 inline bool operator<(const Evaluacion& a, const Evaluacion& b) {
     if (a.bloques != b.bloques) return a.bloques < b.bloques;
     return a.penalizacion < b.penalizacion;
@@ -36,6 +50,19 @@ Evaluacion operator-(const Evaluacion& a, const Evaluacion& b) {
     return r;
 }
 
+// =============================================================================
+// FUNCIONES DE VALIDACIÓN
+// =============================================================================
+
+/**
+ * Verifica si un bloque es válido para un examen (sin conflictos de alumnos)
+ * @param examen Examen a verificar
+ * @param bloqueNuevo Bloque destino
+ * @param AlumnosXPruebas Lista de alumnos por examen
+ * @param PruebasXAlumnos Mapa de exámenes por alumno
+ * @param instancia Solución actual
+ * @return true si el bloque es válido, false si hay conflicto
+ */
 bool verificarBloqueValido( int examen,int bloqueNuevo,const vector<vector<int>>& AlumnosXPruebas,const map<int, vector<int>>& PruebasXAlumnos, const vector<pair<int,int>>& instancia) {
     if (bloqueNuevo < 0){
         return false;
@@ -52,17 +79,27 @@ bool verificarBloqueValido( int examen,int bloqueNuevo,const vector<vector<int>>
             // Ignorar el mismo examen
             if (otroExamen == examen) continue;
 
-            // Si tiene otro examen en el mismo bloque → NO válido
+            // Si tiene otro examen en el mismo bloque, NO válido
             if (instancia[otroExamen].first == bloqueNuevo) {
                 return false;
             }
         }
     }
 
-    // No hubo conflictos → válido
+    // No hubo conflictos, válido
     return true;
 }
 
+/**
+ * Verifica si una sala es válida para un examen (capacidad y disponibilidad)
+ * @param examen Examen a verificar
+ * @param nuevaSala Sala destino
+ * @param nuevoBloque Bloque destino
+ * @param Salas Capacidades de las salas
+ * @param AlumnosXPruebas Lista de alumnos por examen
+ * @param UsoSalas Mapa de uso de salas por bloque
+ * @return true si la sala es válida, false si no cumple capacidad o está ocupada
+ */
 bool verificarSalaValida(int examen,int nuevaSala,int nuevoBloque,const vector<int>& Salas,const vector<vector<int>>& AlumnosXPruebas,const vector<map<int,bool>>& UsoSalas) {
     int Nalumnos = AlumnosXPruebas[examen].size();
 
@@ -72,7 +109,6 @@ bool verificarSalaValida(int examen,int nuevaSala,int nuevoBloque,const vector<i
     }
 
     // 2) Verificar si la sala está libre en ese bloque
-    //    UsoSalas[sala][bloque] = true si está ocupada
     auto it = UsoSalas[nuevaSala].find(nuevoBloque);
     if (it != UsoSalas[nuevaSala].end() && it->second == true) {
         return false;
@@ -82,7 +118,18 @@ bool verificarSalaValida(int examen,int nuevaSala,int nuevoBloque,const vector<i
     return true;
 }
 
-// funcion que evalua que tan buena es una instancia
+// =============================================================================
+// FUNCIONES DE EVALUACIÓN
+// =============================================================================
+
+/**
+ * Evalúa la calidad de una solución completa
+ * @param instancia Solución a evaluar
+ * @param bloques Mapa de bloques y exámenes asignados
+ * @param AlumnosXPruebas Lista de alumnos por examen
+ * @param PruebasXAlumnos Mapa de exámenes por alumno
+ * @return Evaluación de la solución
+ */
 Evaluacion FuncionEvaluacion( const vector<pair<int,int>>& instancia, const vector<map<int,bool>>& bloques, const vector<vector<int>>& AlumnosXPruebas, const map<int, vector<int>>& PruebasXAlumnos){
     vector<int> Penal = {16,8,4,2,1};
 
@@ -90,15 +137,17 @@ Evaluacion FuncionEvaluacion( const vector<pair<int,int>>& instancia, const vect
     fe.bloques = bloques.size();
     fe.penalizacion = 0;
 
-    for (int examen = 0 ; examen < instancia.size() ; examen++) {
+    // Evaluar cada examen
+    for (size_t examen = 0; examen < instancia.size(); examen++) {
         int bloque = instancia[examen].first;
-        fe.penalizacion += bloque;
+        fe.penalizacion += bloque; // Factor de posición
 
         const vector<int>& alumnos = AlumnosXPruebas[examen];
 
+        // Verificar proximidad con exámenes futuros
         for (int x = 1; x <= 5; x++) {
             int bloqueComparar = bloque + x;
-            if (bloqueComparar >= bloques.size()) break;
+            if (bloqueComparar >= static_cast<int>(bloques.size())) break;
 
             const auto& examenes = bloques[bloqueComparar];
 
@@ -109,7 +158,7 @@ Evaluacion FuncionEvaluacion( const vector<pair<int,int>>& instancia, const vect
                 for (int ex2 : itPA->second) {
                     auto it = examenes.find(ex2);
                     if (it != examenes.end() && it->second) {
-                        fe.penalizacion += Penal[x-1];
+                        fe.penalizacion += Penal[x-1]; // Aplicar penalización
                         goto siguienteBloque;
                     }
                 }
@@ -121,7 +170,15 @@ Evaluacion FuncionEvaluacion( const vector<pair<int,int>>& instancia, const vect
     return fe;
 }
 
-// Calcula la evaluacion de un examen especifico
+/**
+ * Evalúa el impacto de un examen específico (Evaluación Incremental)
+ * @param instancia Solución actual
+ * @param bloques Mapa de bloques
+ * @param AlumnosXPruebas Lista de alumnos por examen
+ * @param PruebasXAlumnos Mapa de exámenes por alumno
+ * @param examen Examen a evaluar
+ * @return Evaluación del examen específico
+ */
 Evaluacion FExExamen(const vector<pair<int,int>>& instancia, const vector<map<int,bool>>& bloques, const vector<vector<int>>& AlumnosXPruebas, const map<int, vector<int>>& PruebasXAlumnos, int examen){
     vector<int> Penal = {16,8,4,2,1};
 
@@ -131,7 +188,7 @@ Evaluacion FExExamen(const vector<pair<int,int>>& instancia, const vector<map<in
     fe.bloques = bloques.size();
     fe.penalizacion = bloque;
 
-    // bloques hacia atrás
+    // Verificar proximidad con exámenes en bloques anteriores
     for (int x = 1; x <= 5; x++) {
         int b = bloque - x;
         if (b < 0) break;
@@ -153,10 +210,10 @@ Evaluacion FExExamen(const vector<pair<int,int>>& instancia, const vector<map<in
         atras_end:;
     }
 
-    // bloques hacia adelante
+    // Verificar proximidad con exámenes en bloques posteriores
     for (int x = 1; x <= 5; x++) {
         int b = bloque + x;
-        if (b >= bloques.size()) break;
+        if (b >= static_cast<int>(bloques.size())) break;
 
         const auto& examenes = bloques[b];
 
@@ -178,7 +235,13 @@ Evaluacion FExExamen(const vector<pair<int,int>>& instancia, const vector<map<in
     return fe;
 }
 
-// Crea una solucion inicial estandar
+// =============================================================================
+// GENERACIÓN DE SOLUCIONES INICIALES
+// =============================================================================
+
+/**
+ * Genera solución inicial usando estrategia Greedy (compacta)
+ */
 vector<pair<int,int>> SolucionInicialGreedy( int NE, vector<map<int,bool>>& bloques, vector<map<int,bool>>& UsoSalas , const vector<vector<int>>& AlumnosXPruebas, const map<int, vector<int>>& PruebasXAlumnos, int NS, const vector<int>& Salas){
     vector<pair<int,int>> instancia(NE, {-1,-1});
     bloques.push_back({}); 
@@ -210,7 +273,11 @@ vector<pair<int,int>> SolucionInicialGreedy( int NE, vector<map<int,bool>>& bloq
     return instancia;
 }
 
+/**
+ * Genera solución inicial Naive (un bloque por examen)
+ */
 vector<pair<int,int>> SolucionInicialNaive( int NE, vector<map<int,bool>>& bloques, vector<map<int,bool>>& UsoSalas , const vector<vector<int>>& AlumnosXPruebas, const map<int, vector<int>>& PruebasXAlumnos, int NS, const vector<int>& Salas){
+    (void)PruebasXAlumnos;
     vector<pair<int,int>> instancia(NE, {-1,-1});
     for(int i=0; i<NE; i++){
         bloques.push_back({});
@@ -230,6 +297,9 @@ vector<pair<int,int>> SolucionInicialNaive( int NE, vector<map<int,bool>>& bloqu
     return instancia;
 }
 
+/**
+ * Genera solución inicial aleatoria factible
+ */
 vector<pair<int,int>> SolucionInicialAleatorio( int NE, vector<map<int,bool>>& bloques, vector<map<int,bool>>& UsoSalas , const vector<vector<int>>& AlumnosXPruebas, const map<int, vector<int>>& PruebasXAlumnos, int NS, const vector<int>& Salas){
     vector<pair<int,int>> instancia(NE, {-1,-1});
     bloques.push_back({}); 
@@ -239,7 +309,7 @@ vector<pair<int,int>> SolucionInicialAleatorio( int NE, vector<map<int,bool>>& b
 
         while (!asignado) {
             int bloque = rand() % max(0, (int)bloques.size() + 1);  
-            if (bloque == bloques.size()) bloques.push_back({});
+            if (bloque == static_cast<int>(bloques.size())) bloques.push_back({});
             int sala = rand() % NS;
 
             bool okBloque = verificarBloqueValido( examen, bloque, AlumnosXPruebas, PruebasXAlumnos, instancia);
@@ -256,6 +326,13 @@ vector<pair<int,int>> SolucionInicialAleatorio( int NE, vector<map<int,bool>>& b
     return instancia;
 }
 
+// =============================================================================
+// FUNCIONES DE BÚSQUEDA TABÚ
+// =============================================================================
+
+/**
+ * Verifica si un examen está en la lista tabú
+ */
 bool estaEnTabu(int examen, const deque<int>& listaTabu) {
     for (const auto& m : listaTabu)
         if (m == examen)
@@ -263,26 +340,10 @@ bool estaEnTabu(int examen, const deque<int>& listaTabu) {
     return false;
 }
 
-void guardarResultados( int archivo, int inicial, double tiempoInicial, double tiempoIter, int mejorpenalizacion,int bloques , int iteraciones ) {
-    string nombre;
-    switch (inicial) {
-        case 1: nombre = "Greedy.txt"; break;
-        case 2: nombre = "Naive.txt"; break;
-        case 3: nombre = "Aleatorio.txt"; break;
-    }
-
-    ofstream out(nombre , ios::app);
-
-    out << "Archivo: " << archivo << "\n";
-    out << "Tiempo Sol Inicial(ms): " << tiempoInicial << "\n";
-    out << "Tiempo Iteraciones(ms): " << tiempoIter << "\n";
-    out << "Iteraciones: " << iteraciones << "\n";
-    out << "Mejor Sol: " << bloques << " "<< mejorpenalizacion << "\n";
-    out << "-------------------------------------\n";
-
-    out.close();
-}
-
+/**
+ * Realiza una iteración de la búsqueda tabú
+ * @return Mejor movimiento aplicado
+ */
 Movimiento iteracion( int NE, vector<map<int,bool>>& bloques, vector<map<int,bool>>& UsoSalas , const vector<vector<int>>& AlumnosXPruebas, const map<int, vector<int>>& PruebasXAlumnos, int NS, const vector<int>& Salas, vector<pair<int,int>>& instancia, const deque<int>& listaTabu) {
     Movimiento mejorvecino = {-1, 0, 0};
     Evaluacion mejorFE = {INT_MAX, INT_MAX};
@@ -309,7 +370,7 @@ Movimiento iteracion( int NE, vector<map<int,bool>>& bloques, vector<map<int,boo
 
         if (bloqueSigVal){
             bloquesMod[bloqueActual][examen]= false;
-            if(bloqueSig == bloques.size()){
+            if(bloqueSig == static_cast<int>(bloques.size())){
                 bloquesMod.push_back({});
             }
             bloquesMod[bloqueSig][examen]= true;
@@ -446,6 +507,49 @@ Movimiento iteracion( int NE, vector<map<int,bool>>& bloques, vector<map<int,boo
     return mejorvecino;
 }
 
+// =============================================================================
+// FUNCIONES DE REGISTRO Y RESULTADOS
+// =============================================================================
+
+/**
+ * Guarda los resultados de una ejecución en archivo
+ */
+void guardarResultados( int archivo, int inicial, double tiempoInicial, double tiempoIter, int mejorpenalizacion,int bloques , int iteraciones ) {
+    string nombre;
+    switch (inicial) {
+        case 1: nombre = "Greedy.txt"; break;
+        case 2: nombre = "Naive.txt"; break;
+        case 3: nombre = "Aleatorio.txt"; break;
+    }
+
+    ofstream out(nombre , ios::app);
+
+    out << "Archivo: " << archivo << "\n";
+    out << "Tiempo Sol Inicial(ms): " << tiempoInicial << "\n";
+    out << "Tiempo Iteraciones(ms): " << tiempoIter << "\n";
+    out << "Iteraciones: " << iteraciones << "\n";
+    out << "Mejor Sol: " << bloques << " "<< mejorpenalizacion << "\n";
+    out << "-------------------------------------\n";
+
+    out.close();
+}
+
+// =============================================================================
+// ALGORITMO PRINCIPAL DE RESOLUCIÓN
+// =============================================================================
+
+/**
+ * Algoritmo principal de Búsqueda Tabú para resolver el ETP
+ * @param NE Número de exámenes
+ * @param AlumnosXPruebas Lista de alumnos por examen
+ * @param PruebasXAlumnos Mapa de exámenes por alumno
+ * @param NS Número de salas
+ * @param Salas Capacidades de las salas
+ * @param inicial Estrategia de inicialización (1:Greedy, 2:Naive, 3:Aleatorio)
+ * @param archivoID Identificador del archivo de instancia
+ * @param maxIT Número máximo de iteraciones
+ * @return Mejor solución encontrada
+ */
 vector<pair<int,int>> Resolver( int NE, const vector<vector<int>>& AlumnosXPruebas, const map<int, vector<int>>& PruebasXAlumnos, int NS, const vector<int>& Salas, int inicial, int archivoID, int maxIT){
     vector<map<int,bool>> UsoSalas(NS), bloques;
     vector<pair<int,int>> instancia;
@@ -512,15 +616,23 @@ vector<pair<int,int>> Resolver( int NE, const vector<vector<int>>& AlumnosXPrueb
     return MejorInstancia;
 }
 
-void LeerArchivo(string Nombre, string i, int Idarchivo, int iteraciones){
+// =============================================================================
+// LECTURA DE ARCHIVOS Y FUNCIÓN MAIN
+// =============================================================================
+
+/**
+ * Lee un archivo de instancia y ejecuta el algoritmo
+ */
+void LeerArchivo(string Nombre, string i, int Idarchivo, int iteraciones) {
     ifstream in(Nombre);
     
     int NE;
     in >> NE;
     in.ignore(numeric_limits<streamsize>::max(), '\n');
 
-    cout<< " Numero de examenes: " << NE <<endl;
+    cout << "Numero de examenes: " << NE << endl;
 
+    // Leer datos de alumnos y exámenes
     map<int, vector<int>> PruebasXAlumnos;  
     vector<vector<int>> AlumnosXPruebas(NE); 
 
@@ -539,30 +651,33 @@ void LeerArchivo(string Nombre, string i, int Idarchivo, int iteraciones){
         }
     }
 
+    // Leer datos de salas
     int NS;
     in >> NS;
 
-    cout<< " Numero de Salas: " << NS <<endl;
+    cout << "Numero de Salas: " << NS << endl;
     vector<int> Salas(NS);
 
-    for (int s = 0;  s < NS ; s++ ){
+    for (int s = 0; s < NS; s++) {
         in >> Salas[s];
     }
     in.close();
     
-    
+    // Ejecutar con las tres estrategias de inicialización
     for (int n = 1; n <= 3; n++) {
-        vector<pair<int,int>> MejorInstancia = Resolver( NE, AlumnosXPruebas, PruebasXAlumnos, NS, Salas, n , Idarchivo , iteraciones);
+        vector<pair<int,int>> MejorInstancia = Resolver(NE, AlumnosXPruebas, PruebasXAlumnos, NS, Salas, n, Idarchivo, iteraciones);
+        
+        // Guardar solución en archivo de salida
         string Salida = "";
         switch (n) {
-            case 1: Salida = "salidasGreedy/i";break;
-            case 2: Salida = "salidasNaive/i";break;
-            case 3: Salida = "salidasAleatoria/i";break;
+            case 1: Salida = "salidasGreedy/i"; break;
+            case 2: Salida = "salidasNaive/i"; break;
+            case 3: Salida = "salidasAleatoria/i"; break;
         }
         Salida += i + ".out";
         ofstream out(Salida);
 
-        for (int examen = 0; examen < MejorInstancia.size(); examen++) {
+        for (size_t examen = 0; examen < MejorInstancia.size(); examen++) {
             int bloque = MejorInstancia[examen].first;
             int sala   = MejorInstancia[examen].second;
             out << examen << " " << bloque << " " << sala << "\n";
@@ -572,24 +687,35 @@ void LeerArchivo(string Nombre, string i, int Idarchivo, int iteraciones){
     }
 }
 
+/**
+ * Función principal - Coordina la ejecución de experimentos
+ */
 int main() {
+    // Limpiar archivos de resultados anteriores
     ofstream("Greedy.txt", ios::trunc).close();
     ofstream("Naive.txt", ios::trunc).close();
     ofstream("Aleatorio.txt", ios::trunc).close();
-    for (int m = 1 ;m <= 3; m++ ){
+    
+    // Configurar semilla aleatoria
+    srand(time(0));
+    
+    // Ejecutar experimentos con diferentes números de iteraciones
+    for (int m = 1; m <= 3; m++) {
         int iteraciones;
         switch (m) {
             case 1: iteraciones = 60; break;
             case 2: iteraciones = 500; break;
             case 3: iteraciones = 1000; break;
         }
+        
+        // Procesar todas las instancias
         for (int i = 1; i <= 8; i++) {
-            cout << "archivo: "<< i <<endl;
+            cout << "Procesando archivo: " << i << endl;
             string Nombre = "instancias/i";
             Nombre += to_string(i) + ".in";
-            LeerArchivo(Nombre , to_string(i), i, iteraciones);
-        
+            LeerArchivo(Nombre, to_string(i), i, iteraciones);
         }
     }
+    
     return 0;
 }

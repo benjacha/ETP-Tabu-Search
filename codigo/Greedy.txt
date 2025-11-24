@@ -1,90 +1,144 @@
 Archivo: 1
-Tiempo Sol Inicial(ms): 1287.4
-Tiempo Iteraciones(ms): 5961.76
+Tiempo Sol Inicial(ms): 12.8826
+Tiempo Iteraciones(ms): 949.271
 Iteraciones: 60
-Mejor Sol: 89 38997
+Mejor Sol: 89 38686
 -------------------------------------
 Archivo: 2
-Tiempo Sol Inicial(ms): 2213.63
-Tiempo Iteraciones(ms): 10906.8
+Tiempo Sol Inicial(ms): 6.98247
+Tiempo Iteraciones(ms): 1987.66
 Iteraciones: 60
-Mejor Sol: 28 22828
+Mejor Sol: 28 22886
 -------------------------------------
 Archivo: 3
-Tiempo Sol Inicial(ms): 3260.66
-Tiempo Iteraciones(ms): 14401.1
+Tiempo Sol Inicial(ms): 11.4836
+Tiempo Iteraciones(ms): 2514.22
 Iteraciones: 60
-Mejor Sol: 38 29292
+Mejor Sol: 38 29288
 -------------------------------------
 Archivo: 4
-Tiempo Sol Inicial(ms): 396.859
-Tiempo Iteraciones(ms): 4782.9
+Tiempo Sol Inicial(ms): 19.9232
+Tiempo Iteraciones(ms): 490.627
 Iteraciones: 60
 Mejor Sol: 273 40307
 -------------------------------------
 Archivo: 5
-Tiempo Sol Inicial(ms): 3272.77
-Tiempo Iteraciones(ms): 10937.5
+Tiempo Sol Inicial(ms): 53.5707
+Tiempo Iteraciones(ms): 1643.87
 Iteraciones: 60
-Mejor Sol: 340 186732
+Mejor Sol: 340 186758
 -------------------------------------
 Archivo: 6
-Tiempo Sol Inicial(ms): 243.803
-Tiempo Iteraciones(ms): 2106.16
+Tiempo Sol Inicial(ms): 3.13593
+Tiempo Iteraciones(ms): 351.854
 Iteraciones: 60
-Mejor Sol: 32 6947
+Mejor Sol: 32 6959
 -------------------------------------
 Archivo: 7
-Tiempo Sol Inicial(ms): 2983.01
-Tiempo Iteraciones(ms): 12222.5
+Tiempo Sol Inicial(ms): 17.8642
+Tiempo Iteraciones(ms): 2365.62
 Iteraciones: 60
-Mejor Sol: 75 56614
+Mejor Sol: 75 56447
 -------------------------------------
 Archivo: 8
-Tiempo Sol Inicial(ms): 1253.43
-Tiempo Iteraciones(ms): 6293.14
+Tiempo Sol Inicial(ms): 9.9302
+Tiempo Iteraciones(ms): 871.413
 Iteraciones: 60
-Mejor Sol: 77 33579
+Mejor Sol: 77 33588
 -------------------------------------
 Archivo: 1
-Tiempo Sol Inicial(ms): 1321.71
-Tiempo Iteraciones(ms): 44898.3
+Tiempo Sol Inicial(ms): 12.4996
+Tiempo Iteraciones(ms): 7094.51
 Iteraciones: 500
-Mejor Sol: 89 37485
+Mejor Sol: 89 36824
 -------------------------------------
 Archivo: 2
-Tiempo Sol Inicial(ms): 2214.71
-Tiempo Iteraciones(ms): 81853.4
+Tiempo Sol Inicial(ms): 6.71381
+Tiempo Iteraciones(ms): 14732.6
 Iteraciones: 500
-Mejor Sol: 28 18379
+Mejor Sol: 28 18308
 -------------------------------------
 Archivo: 3
-Tiempo Sol Inicial(ms): 3282.85
-Tiempo Iteraciones(ms): 103930
+Tiempo Sol Inicial(ms): 11.6792
+Tiempo Iteraciones(ms): 18913.9
 Iteraciones: 500
-Mejor Sol: 38 26674
+Mejor Sol: 38 26819
 -------------------------------------
 Archivo: 4
-Tiempo Sol Inicial(ms): 411.845
-Tiempo Iteraciones(ms): 29779.7
+Tiempo Sol Inicial(ms): 20.1274
+Tiempo Iteraciones(ms): 3045.41
 Iteraciones: 500
 Mejor Sol: 273 40307
 -------------------------------------
 Archivo: 5
-Tiempo Sol Inicial(ms): 2736.32
-Tiempo Iteraciones(ms): 77827.2
+Tiempo Sol Inicial(ms): 53.8701
+Tiempo Iteraciones(ms): 12825.5
 Iteraciones: 500
-Mejor Sol: 340 186984
+Mejor Sol: 340 186076
 -------------------------------------
 Archivo: 6
-Tiempo Sol Inicial(ms): 241.776
-Tiempo Iteraciones(ms): 15633.8
+Tiempo Sol Inicial(ms): 4.05756
+Tiempo Iteraciones(ms): 2717.07
 Iteraciones: 500
-Mejor Sol: 32 6648
+Mejor Sol: 32 6785
 -------------------------------------
 Archivo: 7
-Tiempo Sol Inicial(ms): 2942.88
-Tiempo Iteraciones(ms): 91450.5
+Tiempo Sol Inicial(ms): 18.4858
+Tiempo Iteraciones(ms): 17808
 Iteraciones: 500
-Mejor Sol: 75 51567
+Mejor Sol: 75 51523
+-------------------------------------
+Archivo: 8
+Tiempo Sol Inicial(ms): 9.78163
+Tiempo Iteraciones(ms): 6270.01
+Iteraciones: 500
+Mejor Sol: 77 32739
+-------------------------------------
+Archivo: 1
+Tiempo Sol Inicial(ms): 12.6862
+Tiempo Iteraciones(ms): 13989.9
+Iteraciones: 1000
+Mejor Sol: 89 38416
+-------------------------------------
+Archivo: 2
+Tiempo Sol Inicial(ms): 7.28792
+Tiempo Iteraciones(ms): 27006.7
+Iteraciones: 1000
+Mejor Sol: 28 16618
+-------------------------------------
+Archivo: 3
+Tiempo Sol Inicial(ms): 13.2729
+Tiempo Iteraciones(ms): 35847.8
+Iteraciones: 1000
+Mejor Sol: 38 25770
+-------------------------------------
+Archivo: 4
+Tiempo Sol Inicial(ms): 20.3026
+Tiempo Iteraciones(ms): 5957.73
+Iteraciones: 1000
+Mejor Sol: 273 40307
+-------------------------------------
+Archivo: 5
+Tiempo Sol Inicial(ms): 52.7753
+Tiempo Iteraciones(ms): 24345.7
+Iteraciones: 1000
+Mejor Sol: 340 186052
+-------------------------------------
+Archivo: 6
+Tiempo Sol Inicial(ms): 3.11711
+Tiempo Iteraciones(ms): 5366.09
+Iteraciones: 1000
+Mejor Sol: 32 5710
+-------------------------------------
+Archivo: 7
+Tiempo Sol Inicial(ms): 18.4101
+Tiempo Iteraciones(ms): 33496.3
+Iteraciones: 1000
+Mejor Sol: 75 49844
+-------------------------------------
+Archivo: 8
+Tiempo Sol Inicial(ms): 10.2765
+Tiempo Iteraciones(ms): 12561.3
+Iteraciones: 1000
+Mejor Sol: 77 32548
 -------------------------------------
